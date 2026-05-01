@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/sajan/Downloads/cheat/client/src/pages/student/*.js)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s --max-time 10 \"https://ep-bitter-rain-amcc90xa.c-5.us-east-1.aws.neon.tech\")",
+      "Bash(pip install *)",
+      "Bash(python generate_pdf.py)",
+      "Bash(python -c \"from pypdf import PdfReader; r = PdfReader\\('AntiCheat_Exam_Platform_Interview_Guide.pdf'\\); print\\(f'Pages: {len\\(r.pages\\)}'\\)\")",
+      "Bash(python -c \"from pypdf import PdfReader; r = PdfReader\\('AntiCheat_Exam_Platform_Interview_Guide.pdf'\\); print\\(f'Total pages: {len\\(r.pages\\)}'\\)\")",
+      "Bash(gh auth *)",
+      "Bash(node make_ppt.js)",
+      "Bash(python -m markitdown \"C:\\\\Users\\\\sajan\\\\Downloads\\\\ExamSecure_Presentation.pptx\")"
+    ]
+  }
+}

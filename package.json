@@ -1,0 +1,6 @@
+{
+  "name": "exam-knight",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
