@@ -158,7 +158,7 @@ function QuestionForm({ initial, onSave, onCancel, saving }) {
             className="form-control"
             value={q.testCases}
             onChange={(e) => setField('testCases', e.target.value)}
-            placeholder={'[{"input": "1 2", "output": "3"}]'}
+            placeholder={'[{"input": "1 2", "expectedOutput": "3"}]'}
             style={{ fontFamily: 'monospace', fontSize: 13 }}
           />
         </div>
