@@ -141,7 +141,7 @@ export default function ExamMonitor() {
     socket.emit('join_exam_monitor', examId);
 
     const handleStudentJoined = (payload) => {
-      const { studentId, name, email } = payload;
+      const { studentId, studentName: name, email } = payload;
       setStudents((prev) => ({
         ...prev,
         [studentId]: {
@@ -180,7 +180,8 @@ export default function ExamMonitor() {
     };
 
     const handleProctoringAlert = (payload) => {
-      const { studentId, type, message, tabSwitchCount } = payload;
+      const { studentId, eventType: type, details, tabSwitchCount } = payload;
+      const message = details?.reason || type;
       setStudents((prev) => {
         if (!prev[studentId]) return prev;
         const student = prev[studentId];
