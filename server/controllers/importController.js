@@ -65,6 +65,7 @@ exports.importQuestions = async (req, res) => {
 
     const exam = await Exam.findByPk(req.params.examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
+    if (exam.status !== 'draft') return res.status(409).json({ message: 'Cannot import questions into a published exam' });
 
     // Only the exam owner or admin can import
     if (req.user.role !== 'admin' && exam.createdBy !== req.user.id) {
