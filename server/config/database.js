@@ -13,10 +13,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   logging: false,
   dialectModule: require('pg'),
   dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
+    ...(process.env.DATABASE_URL?.includes('localhost') || process.env.DATABASE_URL?.includes('@db:') ? {} : { ssl: { require: true, rejectUnauthorized: true } }),
   },
   pool: {
     max: 3,
