@@ -80,11 +80,13 @@ exports.submitExam = async (req, res) => {
     if (!submission) return res.status(404).json({ message: 'Active submission not found' });
 
     const autoSubmit = req.body.autoSubmit || false;
+    // Late submissions are accepted only as automatic finalization of the active attempt.
+    const deadline = Math.min(new Date(submission.exam.endTime).getTime(), new Date(submission.startedAt).getTime() + submission.exam.duration * 60000);
     const totalScore = await gradeSubmission(submission);
 
     await submission.update({
       submittedAt: new Date(),
-      status: autoSubmit ? 'auto_submitted' : 'submitted',
+      status: autoSubmit || Date.now() >= deadline ? 'auto_submitted' : 'submitted',
       totalScore,
     });
 
