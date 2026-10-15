@@ -10,7 +10,7 @@ module.exports = function setupSocket(io) {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
-      if (!user) return next(new Error('User not found'));
+      if (!user || !user.isActive) return next(new Error('User not found or inactive'));
 
       socket.user = user;
       next();
@@ -23,8 +23,11 @@ module.exports = function setupSocket(io) {
     console.log(`Socket connected: ${socket.user.name} (${socket.user.role})`);
 
     // Teacher joins exam monitoring room
-    socket.on('join_exam_monitor', (examId) => {
+    socket.on('join_exam_monitor', async (examId) => {
       if (socket.user.role === 'teacher' || socket.user.role === 'admin') {
+        const { Exam } = require('../models');
+        const exam = await Exam.findByPk(examId);
+        if (!exam || (socket.user.role !== 'admin' && exam.createdBy !== socket.user.id)) return;
         socket.join(`exam:${examId}`);
         console.log(`${socket.user.name} monitoring exam ${examId}`);
       }
@@ -35,9 +38,12 @@ module.exports = function setupSocket(io) {
     });
 
     // Student joins exam room
-    socket.on('join_exam', (data) => {
+    socket.on('join_exam', async (data) => {
       if (socket.user.role === 'student') {
-        const { examId, submissionId } = data;
+        const { examId, submissionId } = data || {};
+        const { Submission } = require('../models');
+        const attempt = await Submission.findOne({ where: { id: submissionId, examId, studentId: socket.user.id, status: 'in_progress' } });
+        if (!attempt) return;
         socket.join(`exam:${examId}`);
         socket.join(`submission:${submissionId}`);
 
@@ -53,6 +59,7 @@ module.exports = function setupSocket(io) {
 
     // Student sends heartbeat
     socket.on('heartbeat', (data) => {
+      if (!data || socket.user.role !== 'student' || !socket.rooms.has('submission:' + data.submissionId)) return;
       io.to(`exam:${data.examId}`).emit('student_heartbeat', {
         studentId: socket.user.id,
         studentName: socket.user.name,
@@ -63,6 +70,7 @@ module.exports = function setupSocket(io) {
 
     // Real-time proctoring events forwarded via socket
     socket.on('proctor_event', (data) => {
+      if (!data || socket.user.role !== 'student' || !socket.rooms.has('submission:' + data.submissionId)) return;
       io.to(`exam:${data.examId}`).emit('proctoring_alert', {
         studentId: socket.user.id,
         studentName: socket.user.name,
