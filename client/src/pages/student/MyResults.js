@@ -19,7 +19,7 @@ export default function MyResults() {
   };
 
   const getGrade = (pct) => {
-    if (!pct) return '—';
+    if (pct == null || Number.isNaN(pct)) return '—';
     if (pct >= 90) return 'A+';
     if (pct >= 80) return 'A';
     if (pct >= 70) return 'B';
