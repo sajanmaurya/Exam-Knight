@@ -84,7 +84,7 @@ export default function FaceDetection({ submissionId, enabled, socket, examId })
 
         if (count === 0) {
           missesRef.current++;
-          if (missesRef.current >= NO_FACE_THRESHOLD) {
+          if (missesRef.current === NO_FACE_THRESHOLD) {
             logEvent('face_not_detected', { consecutiveMisses: missesRef.current });
           }
         } else {
