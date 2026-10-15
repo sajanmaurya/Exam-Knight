@@ -7,7 +7,7 @@ const questionCtrl = require('../controllers/questionController');
 router.post('/', authenticate, authorize('teacher', 'admin'), examCtrl.createExam);
 router.get('/my-exams', authenticate, authorize('teacher', 'admin'), examCtrl.getTeacherExams);
 router.get('/all', authenticate, authorize('admin'), examCtrl.getAllExams);
-router.get('/:id', authenticate, examCtrl.getExamDetail);
+router.get('/:id', authenticate, authorize('teacher', 'admin'), examCtrl.getExamDetail);
 router.put('/:id', authenticate, authorize('teacher', 'admin'), examCtrl.updateExam);
 router.delete('/:id', authenticate, authorize('teacher', 'admin'), examCtrl.deleteExam);
 router.post('/:id/publish', authenticate, authorize('teacher', 'admin'), examCtrl.publishExam);

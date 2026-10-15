@@ -4,7 +4,12 @@ const { Op } = require('sequelize');
 // Teacher: Create exam
 exports.createExam = async (req, res) => {
   try {
-    const exam = await Exam.create({ ...req.body, createdBy: req.user.id });
+    const editableFields = ['title', 'description', 'subject', 'duration', 'totalMarks', 'passingMarks', 'negativeMarking', 'randomizeQuestions', 'randomizeOptions', 'showResults', 'maxAttempts', 'startTime', 'endTime', 'instructions'];
+    const fields = Object.fromEntries(editableFields.filter(k => req.body[k] !== undefined).map(k => [k, req.body[k]]));
+    if (!fields.title || !Number.isFinite(Number(fields.duration)) || Number(fields.duration) <= 0 || !Number.isFinite(Number(fields.totalMarks)) || Number(fields.totalMarks) <= 0 || !fields.startTime || !fields.endTime || new Date(fields.startTime) >= new Date(fields.endTime)) {
+      return res.status(400).json({ message: 'Invalid exam details or schedule' });
+    }
+    const exam = await Exam.create({ ...fields, createdBy: req.user.id });
     res.status(201).json({ exam });
   } catch (err) {
     console.error('Create exam error:', err);
@@ -17,7 +22,12 @@ exports.updateExam = async (req, res) => {
   try {
     const exam = await Exam.findOne({ where: { id: req.params.id, createdBy: req.user.id } });
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
-    await exam.update(req.body);
+    if (exam.status !== 'draft') return res.status(409).json({ message: 'Published exams cannot be edited' });
+    const editableFields = ['title', 'description', 'subject', 'duration', 'totalMarks', 'passingMarks', 'negativeMarking', 'randomizeQuestions', 'randomizeOptions', 'showResults', 'maxAttempts', 'startTime', 'endTime', 'instructions'];
+    const fields = Object.fromEntries(editableFields.filter(k => req.body[k] !== undefined).map(k => [k, req.body[k]]));
+    const next = { ...exam.toJSON(), ...fields };
+    if (!next.title || Number(next.duration) <= 0 || Number(next.totalMarks) <= 0 || new Date(next.startTime) >= new Date(next.endTime)) return res.status(400).json({ message: 'Invalid exam details or schedule' });
+    await exam.update(fields);
     res.json({ exam });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update exam' });
@@ -29,6 +39,7 @@ exports.deleteExam = async (req, res) => {
   try {
     const exam = await Exam.findOne({ where: { id: req.params.id, createdBy: req.user.id } });
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
+    if (exam.status !== 'draft') return res.status(409).json({ message: 'Only draft exams can be deleted' });
     await exam.destroy();
     res.json({ message: 'Exam deleted' });
   } catch (err) {
@@ -117,6 +128,8 @@ exports.publishExam = async (req, res) => {
     const questionCount = await Question.count({ where: { examId: exam.id } });
     if (questionCount === 0) return res.status(400).json({ message: 'Add questions before publishing' });
 
+    if (exam.status !== 'draft') return res.status(409).json({ message: 'Only draft exams can be published' });
+    if (new Date(exam.endTime) <= new Date()) return res.status(400).json({ message: 'Cannot publish an expired exam' });
     await exam.update({ status: 'published' });
     res.json({ exam });
   } catch (err) {
@@ -127,6 +140,8 @@ exports.publishExam = async (req, res) => {
 // Teacher: Get exam results / submissions
 exports.getExamSubmissions = async (req, res) => {
   try {
+    const exam = await Exam.findByPk(req.params.id);
+    if (!exam || (req.user.role !== 'admin' && exam.createdBy !== req.user.id)) return res.status(404).json({ message: 'Exam not found' });
     const submissions = await Submission.findAll({
       where: { examId: req.params.id },
       include: [

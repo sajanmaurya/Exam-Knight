@@ -8,7 +8,7 @@ import './AuthPage.css';
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'student' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,7 +26,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const user = await register(form.name, form.email, form.password, form.role);
+      const user = await register(form.name, form.email, form.password);
       toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (err) {
@@ -114,20 +114,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Role</label>
-            <select
-              name="role"
-              className="form-control"
-              value={form.role}
-              onChange={handleChange}
-              required
-            >
-              <option value="student">Student</option>
-              <option value="teacher">Teacher</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
 
           <button
             type="submit"

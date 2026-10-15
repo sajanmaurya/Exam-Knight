@@ -87,9 +87,9 @@ export default function App() {
               <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
               <Route path="/teacher/exams/create" element={<CreateExam />} />
               <Route path="/teacher/exam/:examId" element={<ManageExam />} />
-              <Route path="/teacher/exams/:id/edit" element={<EditExam />} />
+              <Route path="/teacher/exams/:examId/edit" element={<EditExam />} />
               <Route path="/teacher/question-bank" element={<QuestionBank />} />
-              <Route path="/teacher/exams/:id/monitor" element={<MonitorExam />} />
+              <Route path="/teacher/exams/:examId/monitor" element={<MonitorExam />} />
               <Route path="/teacher/submissions/:submissionId" element={<GradeSubmission />} />
             </Route>
 

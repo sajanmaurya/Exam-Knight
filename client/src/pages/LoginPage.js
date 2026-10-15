@@ -93,15 +93,6 @@ export default function LoginPage() {
           <Link to="/register">Create one</Link>
         </p>
 
-        {/* Demo credentials */}
-        <div className="demo-creds">
-          <p className="demo-title">Demo credentials</p>
-          <div className="demo-grid">
-            <div><span className="badge badge-primary">Admin</span><code>admin@demo.com / Admin123!</code></div>
-            <div><span className="badge badge-success">Teacher</span><code>teacher@demo.com / Teacher123!</code></div>
-            <div><span className="badge badge-warning">Student</span><code>student@demo.com / Student123!</code></div>
-          </div>
-        </div>
       </div>
     </div>
   );
