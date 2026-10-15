@@ -40,7 +40,7 @@ export default function useAntiCheat({
 
       // Also forward over socket for real-time teacher view
       if (socket) {
-        socket.emit('proctor_event', { examId, eventType, details });
+        socket.emit('proctor_event', { examId, submissionId, eventType, details });
       }
     },
     [submissionId, examId, socket]
