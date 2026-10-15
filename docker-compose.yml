@@ -47,7 +47,7 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: ${CLIENT_URL:-http://localhost}/api
+        REACT_APP_API_URL: /api
     restart: unless-stopped
     depends_on:
       - server
