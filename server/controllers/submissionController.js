@@ -224,6 +224,7 @@ exports.runCode = async (req, res) => {
     const question = await Question.findOne({ where: { id: questionId, examId: submission.examId, type: 'coding' } });
     if (!question) return res.status(404).json({ message: 'Question not found' });
 
+    if (typeof code !== 'string' || code.length > 50000) return res.status(400).json({ message: 'Invalid code length' });
     const result = await executeCode(language, code);
 
     let testResults = null;
