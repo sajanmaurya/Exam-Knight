@@ -12,6 +12,9 @@ exports.addQuestion = async (req, res) => {
 
     if (exam.status !== 'draft') { await t.rollback(); return res.status(409).json({ message: 'Published exam questions cannot be changed' }); }
     const { type, text, marks, options, testCases, maxWords, tags, difficulty } = req.body;
+    if (!['mcq','subjective','coding'].includes(type) || !text?.trim() || !Number.isFinite(Number(marks)) || Number(marks) <= 0 || (type === 'mcq' && (!Array.isArray(options) || options.length < 2 || options.filter(o => o.isCorrect).length !== 1 || options.some(o => !o.text?.trim())))) {
+      await t.rollback(); return res.status(400).json({ message: 'Invalid question data' });
+    }
     const questionCount = await Question.count({ where: { examId: exam.id } });
 
     const question = await Question.create({
