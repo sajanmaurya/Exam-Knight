@@ -15,6 +15,13 @@ exports.startExam = async (req, res) => {
       return res.status(400).json({ message: 'Exam is not available' });
     }
 
+    // Resume existing in-progress attempts before checking maxAttempts.
+    const existingAttempt = await Submission.findOne({ where: { examId: exam.id, studentId: req.user.id, status: 'in_progress' }, include: [{ model: Answer, as: 'answers' }] });
+    if (existingAttempt) {
+      const end = Math.min(new Date(exam.endTime).getTime(), new Date(existingAttempt.startedAt).getTime() + exam.duration * 60000);
+      if (Date.now() >= end) return res.status(409).json({ message: 'Previous attempt expired' });
+      return res.json({ submission: existingAttempt, questions: await getExamQuestions(exam, existingAttempt), exam: sanitizeExam(exam) });
+    }
     // Check max attempts
     const attemptCount = await Submission.count({
       where: { examId: exam.id, studentId: req.user.id },
@@ -23,23 +30,13 @@ exports.startExam = async (req, res) => {
       return res.status(400).json({ message: 'Maximum attempts reached' });
     }
 
-    // Check for in-progress submission
-    const existing = await Submission.findOne({
-      where: { examId: exam.id, studentId: req.user.id, status: 'in_progress' },
-    });
-    if (existing) {
-      // Resume existing attempt
-      const questions = await getExamQuestions(exam);
-      return res.json({ submission: existing, questions, exam: sanitizeExam(exam) });
-    }
-
     const submission = await Submission.create({
       examId: exam.id,
       studentId: req.user.id,
       startedAt: now,
     });
 
-    const questions = await getExamQuestions(exam);
+    const questions = await getExamQuestions(exam, submission);
     res.status(201).json({ submission, questions, exam: sanitizeExam(exam) });
   } catch (err) {
     console.error('Start exam error:', err);
@@ -47,48 +44,30 @@ exports.startExam = async (req, res) => {
   }
 };
 
+async function activeAttempt(id, studentId) {
+  const s = await Submission.findOne({ where: { id, studentId, status: 'in_progress' }, include: [{ model: Exam, as: 'exam' }] });
+  if (!s) return null;
+  const end = Math.min(new Date(s.exam.endTime).getTime(), new Date(s.startedAt).getTime() + s.exam.duration * 60000);
+  return Date.now() < end ? s : null;
+}
+
 // Student: Save answer
-exports.saveAnswer = async (req, res) => {
+exports.saveAnswer = async (req,res) => {
   try {
+    const submission = await activeAttempt(req.params.submissionId, req.user.id);
+    if (!submission) return res.status(409).json({ message: 'Exam no longer active' });
     const { questionId, selectedOptionId, textAnswer } = req.body;
-    const submission = await Submission.findOne({
-      where: { id: req.params.submissionId, studentId: req.user.id, status: 'in_progress' },
-    });
-    if (!submission) return res.status(404).json({ message: 'Active submission not found' });
-
-    const [answer] = await Answer.upsert({
-      submissionId: submission.id,
-      questionId,
-      selectedOptionId: selectedOptionId || null,
-      textAnswer: textAnswer || null,
-    }, {
-      conflictFields: ['submissionId', 'questionId'],
-    });
-
-    // Try upsert, fall back to find-or-create
-    let saved = answer;
-    if (!saved) {
-      const existing = await Answer.findOne({
-        where: { submissionId: submission.id, questionId },
-      });
-      if (existing) {
-        await existing.update({ selectedOptionId, textAnswer });
-        saved = existing;
-      } else {
-        saved = await Answer.create({
-          submissionId: submission.id,
-          questionId,
-          selectedOptionId: selectedOptionId || null,
-          textAnswer: textAnswer || null,
-        });
-      }
-    }
-
-    res.json({ answer: saved });
-  } catch (err) {
-    console.error('Save answer error:', err);
-    res.status(500).json({ message: 'Failed to save answer' });
-  }
+    const question = await Question.findOne({ where: { id: questionId, examId: submission.examId } });
+    if (!question) return res.status(400).json({ message: 'Invalid question' });
+    if (question.type === 'mcq') {
+      if (selectedOptionId && !(await Option.findOne({ where: { id: selectedOptionId, questionId } }))) return res.status(400).json({ message: 'Invalid option' });
+    } else if (typeof textAnswer !== 'string' || textAnswer.length > 200000) return res.status(400).json({ message: 'Invalid answer' });
+    const fields = question.type === 'mcq' ? { selectedOptionId: selectedOptionId || null, textAnswer: null } : { selectedOptionId: null, textAnswer };
+    let answer = await Answer.findOne({ where: { submissionId: submission.id, questionId } });
+    if (answer) await answer.update(fields);
+    else answer = await Answer.create({ submissionId: submission.id, questionId, ...fields });
+    res.json({ answer });
+  } catch(err) { console.error(err); res.status(500).json({ message: 'Failed to save answer' }); }
 };
 
 // Student: Submit exam
@@ -127,10 +106,8 @@ exports.submitExam = async (req, res) => {
 exports.logProctoringEvent = async (req, res) => {
   try {
     const { eventType, details } = req.body;
-    const submission = await Submission.findOne({
-      where: { id: req.params.submissionId, studentId: req.user.id },
-    });
-    if (!submission) return res.status(404).json({ message: 'Submission not found' });
+    const submission = await activeAttempt(req.params.submissionId, req.user.id);
+    if (!submission) return res.status(409).json({ message: 'Exam no longer active' });
 
     const log = await ProctoringLog.create({
       submissionId: submission.id,
@@ -143,7 +120,7 @@ exports.logProctoringEvent = async (req, res) => {
     // Increment tab switch count
     if (eventType === 'tab_switch') {
       await submission.increment('tabSwitchCount');
-      if (submission.tabSwitchCount >= 3) {
+      if (submission.tabSwitchCount + 1 >= 3) {
         await submission.update({ suspiciousActivity: true });
       }
     }
@@ -176,7 +153,7 @@ exports.getMySubmissions = async (req, res) => {
       include: [{ model: Exam, as: 'exam', attributes: ['title', 'subject', 'totalMarks', 'showResults'] }],
       order: [['createdAt', 'DESC']],
     });
-    res.json({ submissions });
+    res.json({ submissions: submissions.map(s => { const v = s.toJSON(); if (!v.exam?.showResults) v.totalScore = null; return v; }) });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch submissions' });
   }
@@ -200,7 +177,7 @@ exports.getSubmissionDetail = async (req, res) => {
         { model: Exam, as: 'exam' },
       ],
     });
-    if (!submission) return res.status(404).json({ message: 'Submission not found' });
+    if (!submission || (req.user.role !== 'admin' && submission.exam.createdBy !== req.user.id)) return res.status(404).json({ message: 'Submission not found' });
     res.json({ submission });
   } catch (err) {
     console.error(err);
@@ -212,8 +189,9 @@ exports.getSubmissionDetail = async (req, res) => {
 exports.gradeAnswer = async (req, res) => {
   try {
     const { marksAwarded } = req.body;
-    const answer = await Answer.findByPk(req.params.answerId);
-    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+    const answer = await Answer.findByPk(req.params.answerId, { include: [{ model: Question, include: [{ model: Exam }] }] });
+    if (!answer || (req.user.role !== 'admin' && answer.Question.Exam.createdBy !== req.user.id)) return res.status(404).json({ message: 'Answer not found' });
+    if (answer.Question.type === 'mcq' || !Number.isFinite(Number(marksAwarded)) || Number(marksAwarded) < 0 || Number(marksAwarded) > answer.Question.marks) return res.status(400).json({ message: 'Invalid grading marks' });
 
     await answer.update({ marksAwarded, isCorrect: marksAwarded > 0, gradedBy: req.user.id });
 
@@ -243,7 +221,7 @@ exports.runCode = async (req, res) => {
     });
     if (!submission) return res.status(404).json({ message: 'Active submission not found' });
 
-    const question = await Question.findByPk(questionId);
+    const question = await Question.findOne({ where: { id: questionId, examId: submission.examId, type: 'coding' } });
     if (!question) return res.status(404).json({ message: 'Question not found' });
 
     const result = await executeCode(language, code);
@@ -253,7 +231,7 @@ exports.runCode = async (req, res) => {
       testResults = await runTestCases(language, code, question.testCases);
     }
 
-    res.json({ ...result, testResults });
+    res.json({ ...result, testResults: testResults ? { passed: testResults.filter(t=>t.passed).length, total: testResults.length } : null });
   } catch (err) {
     console.error('Run code error:', err);
     res.status(500).json({ message: err.message || 'Code execution failed' });
@@ -262,18 +240,20 @@ exports.runCode = async (req, res) => {
 
 // ── Helpers ──────────────────────────────────────────────
 
-async function getExamQuestions(exam) {
+async function getExamQuestions(exam, submission) {
   const questions = await Question.findAll({
     where: { examId: exam.id },
     include: [{ model: Option, as: 'options', attributes: ['id', 'text', 'order'] }],
     attributes: { exclude: ['testCases'] },
-    order: exam.randomizeQuestions ? require('sequelize').literal('RANDOM()') : [['order', 'ASC']],
+    order: [['order', 'ASC']],
   });
 
+  function hash(str) { let n = 2166136261; for (let i=0; i<str.length; i++) { n ^= str.charCodeAt(i); n=Math.imul(n, 16777619); } return n>>>0; }
+  if (exam.randomizeQuestions) questions.sort((a,b)=>hash(submission.id+a.id)-hash(submission.id+b.id));
   return questions.map((q) => {
     const plain = q.toJSON();
     if (exam.randomizeOptions && plain.options) {
-      plain.options = plain.options.sort(() => Math.random() - 0.5);
+      plain.options = plain.options.sort((a,b)=>hash(submission.id+a.id)-hash(submission.id+b.id));
     }
     return plain;
   });
