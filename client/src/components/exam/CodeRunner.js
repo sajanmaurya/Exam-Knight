@@ -43,8 +43,8 @@ export default function CodeRunner({ submissionId, questionId, code, onCodeChang
     }
   };
 
-  const passCount  = output?.testResults?.filter((t) => t.passed).length ?? 0;
-  const totalTests = output?.testResults?.length ?? 0;
+  const passCount  = output?.testResults?.passed ?? 0;
+  const totalTests = output?.testResults?.total ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -142,7 +142,7 @@ export default function CodeRunner({ submissionId, questionId, code, onCodeChang
           {/* Test results tab */}
           {activeTab === 'tests' && output.testResults && (
             <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {output.testResults.map((tc, i) => (
+              {Array.from({ length: totalTests }, (_, i) => ({ passed: i < passCount })).map((tc, i) => (
                 <div
                   key={i}
                   style={{
@@ -158,17 +158,17 @@ export default function CodeRunner({ submissionId, questionId, code, onCodeChang
                     </span>
                   </div>
                   <div style={{ fontSize: '12px', color: '#94a3b8', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    {tc.input !== undefined && tc.input !== '' && (
+                    {false && (
                       <div><div style={{ color: '#64748b', marginBottom: '2px' }}>Input</div>
                         <pre style={{ margin: 0, fontFamily: 'monospace', color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>{tc.input}</pre>
                       </div>
                     )}
                     <div><div style={{ color: '#64748b', marginBottom: '2px' }}>Expected</div>
-                      <pre style={{ margin: 0, fontFamily: 'monospace', color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>{tc.expectedOutput}</pre>
+                      <pre style={{ margin: 0, fontFamily: 'monospace', color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>{'Hidden during exam'}</pre>
                     </div>
                     <div><div style={{ color: '#64748b', marginBottom: '2px' }}>Got</div>
                       <pre style={{ margin: 0, fontFamily: 'monospace', color: tc.passed ? '#4ade80' : '#f87171', whiteSpace: 'pre-wrap' }}>
-                        {tc.actualOutput || tc.error || '(empty)'}
+                        {tc.passed ? 'Passed' : 'Not passed'}
                       </pre>
                     </div>
                   </div>
