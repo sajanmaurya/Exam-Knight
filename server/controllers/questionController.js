@@ -10,6 +10,7 @@ exports.addQuestion = async (req, res) => {
       return res.status(404).json({ message: 'Exam not found' });
     }
 
+    if (exam.status !== 'draft') { await t.rollback(); return res.status(409).json({ message: 'Published exam questions cannot be changed' }); }
     const { type, text, marks, options, testCases, maxWords, tags, difficulty } = req.body;
     const questionCount = await Question.count({ where: { examId: exam.id } });
 
@@ -60,6 +61,7 @@ exports.updateQuestion = async (req, res) => {
       return res.status(404).json({ message: 'Question not found' });
     }
 
+    if (question.Exam.status !== 'draft') { await t.rollback(); return res.status(409).json({ message: 'Published exam questions cannot be changed' }); }
     const { text, marks, type, options, testCases, maxWords, tags, difficulty } = req.body;
     await question.update({ text, marks, type, testCases, maxWords, tags, difficulty }, { transaction: t });
 
@@ -93,6 +95,7 @@ exports.deleteQuestion = async (req, res) => {
       include: [{ model: Exam, where: { createdBy: req.user.id } }],
     });
     if (!question) return res.status(404).json({ message: 'Question not found' });
+    if (question.Exam.status !== 'draft') return res.status(409).json({ message: 'Published exam questions cannot be changed' });
     await question.destroy();
     res.json({ message: 'Question deleted' });
   } catch (err) {
